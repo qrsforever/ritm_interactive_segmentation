@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 
+import os
 import cv2
 import numpy as np
 from PIL import Image
@@ -15,6 +16,9 @@ class InteractiveDemoApp(ttk.Frame):
     def __init__(self, master, args, model):
         super().__init__(master)
         self.master = master
+        self._filename = None
+        self._maskpath = None
+        self._filepath = None
         master.title("Reviving Iterative Training with Mask Guidance for Interactive Segmentation")
         master.withdraw()
         master.update_idletasks()
@@ -175,12 +179,21 @@ class InteractiveDemoApp(ttk.Frame):
     def _load_image_callback(self):
         self.menubar.focus_set()
         if self._check_entry(self):
-            filename = filedialog.askopenfilename(parent=self.master, filetypes=[
+            basename = None
+            if self._filename is not None:
+                basename = os.path.basename(self._filename)
+            filename = filedialog.askopenfilename(parent=self.master, initialdir=self._filepath,
+                                                  initialfile=basename, filetypes=[
                 ("Images", "*.jpg *.jpeg *.png *.bmp *.tiff"),
                 ("All files", "*.*"),
             ], title="Chose an image")
 
             if len(filename) > 0:
+                self._filename = filename
+                if self._maskpath is None:
+                    self._filepath = os.path.dirname(self._filename)
+                    self._maskpath = f'{self._filepath}/mask'
+                    os.makedirs(self._maskpath, exist_ok=True)
                 image = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
                 self.controller.set_image(image)
                 self.save_mask_btn.configure(state=tk.NORMAL)
@@ -192,8 +205,8 @@ class InteractiveDemoApp(ttk.Frame):
             mask = self.controller.result_mask
             if mask is None:
                 return
-
-            filename = filedialog.asksaveasfilename(parent=self.master, initialfile='mask.png', filetypes=[
+            maskpath = f'{self._maskpath}/{os.path.basename(self._filename)}'
+            filename = filedialog.asksaveasfilename(parent=self.master, initialfile=maskpath, filetypes=[
                 ("PNG image", "*.png"),
                 ("BMP image", "*.bmp"),
                 ("All files", "*.*"),
